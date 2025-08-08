@@ -1,6 +1,7 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 from models import Base  # importa o Base com todos os seus modelos
 
 # URL de conexão ao PostgreSQL
@@ -31,8 +32,17 @@ def init_db():
     """
     Cria todas as tabelas no banco de forma segura.
     """
-    # Cria as tabelas apenas se não existirem (comportamento padrão do SQLAlchemy)
-    Base.metadata.create_all(bind=engine)
+    try:
+        # Verifica se a tabela principal já existe
+        inspector = inspect(engine)
+        if not inspector.has_table("usuarios"):
+            Base.metadata.create_all(bind=engine)
+            print("✅ Tabelas criadas com sucesso!")
+        else:
+            print("ℹ️ Tabelas já existem. Nenhuma ação necessária.")
+    except Exception as e:
+        print(f"❌ Erro ao criar tabelas: {str(e)}")
+        raise RuntimeError(f"Falha na inicialização do banco: {str(e)}")
 
 def get_db():
     """
@@ -41,6 +51,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise e
     finally:
         db.close()  # Garante que a sessão será fechada
 
